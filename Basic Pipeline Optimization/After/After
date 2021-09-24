@@ -1,0 +1,123 @@
+{
+	"properties": {},
+	"description": "Basic Optimization - After",
+	"processes": {
+		"datagenerator1": {
+			"component": "com.sap.util.dataGenerator",
+			"metadata": {
+				"label": "Data Generator",
+				"x": 12,
+				"y": 72,
+				"height": 80,
+				"width": 120,
+				"extensible": true,
+				"config": {
+					"boolTest": "",
+					"script": "// This operator is needed to keep compatibility to the old datagenerator\nvar counter = 0;\n\ngetRandom = function(min, max) {\n    return Math.random() * (max - min) + min;\n};\n\ngetRandomInt = function(min, max) {\n    return Math.floor(Math.random() * (max - min + 1)) + min;\n};\n\ngenerateData = function() {\n\n    // payload = \"3,26.4,60.9,532.0,1.0,24.0,55.0,0,657.0,437.0,1388,5,-33,3.33\"\n\n    var payload = getRandomInt(2, 6) + \",\"; // DeviceID\n    payload += getRandom(25, 26) + \",\"; // Temperature\n    payload += getRandom(40, 60) + \",\"; // Humidity\n    payload += getRandom(500, 600) + \",\"; // CO2    \n    payload += getRandom(0.9, 1.1) + \",\"; // CO    \n    payload += getRandom(23, 25) + \",\"; // LPG    \n    payload += getRandom(50, 60) + \",\"; // Smoke  \n    payload += getRandomInt(0, 1) + \",\"; // Presence \n    payload += getRandom(600, 800) + \",\"; // Light  \n    payload += getRandom(400, 500) + \"\\r\\n\"; // Sound  \n\n    return payload;\n};\n\n$.addTimer(\"500ms\",doTick);\n\nfunction doTick(ctx) {\n    $.output(counter+\",\"+generateData());\n    counter++;\n}\n"
+				}
+			}
+		},
+		"terminal1": {
+			"component": "com.sap.util.terminal",
+			"metadata": {
+				"label": "Terminal",
+				"x": 365.9999990463257,
+				"y": 12,
+				"height": 80,
+				"width": 120,
+				"ui": "dynpath",
+				"config": {}
+			}
+		},
+		"terminal11": {
+			"component": "com.sap.util.terminal",
+			"metadata": {
+				"label": "Terminal",
+				"x": 365.9999990463257,
+				"y": 132,
+				"height": 80,
+				"width": 120,
+				"ui": "dynpath",
+				"config": {}
+			},
+			"name": "terminal1"
+		},
+		"gooperator1": {
+			"component": "com.sap.system.golangExecutor2",
+			"metadata": {
+				"label": "Go Input Splitter",
+				"x": 181,
+				"y": 72,
+				"height": 80,
+				"width": 120,
+				"extensible": true,
+				"config": {
+					"script": "package main\n\nimport \"strings\"\n\nvar Temperature func(interface{})\nvar CO2 func(interface{})\n\nvar values string\n\nfunc main() {}\n\nfunc Input(val interface{}) {\n    values := strings.Split(val.(string), \",\")\n    Temperature(\"The temperature is \" + values[2]) //Sends only Temperature\n    CO2(\"The CO2 level is \" + values[4]) //Sends only CO2\n}",
+					"codelanguage": "go",
+					"maxConcurrency": 1
+				},
+				"additionalinports": [
+					{
+						"name": "input",
+						"type": "string"
+					}
+				],
+				"additionaloutports": [
+					{
+						"name": "Temperature",
+						"type": "string"
+					},
+					{
+						"name": "CO2",
+						"type": "string"
+					}
+				]
+			}
+		}
+	},
+	"groups": [],
+	"connections": [
+		{
+			"metadata": {
+				"points": "305,103 332.99999952316284,103 332.99999952316284,52 360.9999990463257,52"
+			},
+			"src": {
+				"port": "Temperature",
+				"process": "gooperator1"
+			},
+			"tgt": {
+				"port": "in1",
+				"process": "terminal1"
+			}
+		},
+		{
+			"metadata": {
+				"points": "136,112 176,112"
+			},
+			"src": {
+				"port": "output",
+				"process": "datagenerator1"
+			},
+			"tgt": {
+				"port": "input",
+				"process": "gooperator1"
+			}
+		},
+		{
+			"metadata": {
+				"points": "305,121 332.99999952316284,121 332.99999952316284,172 360.9999990463257,172"
+			},
+			"src": {
+				"port": "CO2",
+				"process": "gooperator1"
+			},
+			"tgt": {
+				"port": "in1",
+				"process": "terminal11"
+			}
+		}
+	],
+	"inports": {},
+	"outports": {},
+	"metadata": {}
+}
