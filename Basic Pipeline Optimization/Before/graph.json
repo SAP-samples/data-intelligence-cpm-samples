@@ -1,0 +1,208 @@
+{
+	"properties": {},
+	"description": "Basic Optimization - Before",
+	"processes": {
+		"datagenerator1": {
+			"component": "com.sap.util.dataGenerator",
+			"metadata": {
+				"label": "Data Generator",
+				"x": 12,
+				"y": 72,
+				"height": 80,
+				"width": 120,
+				"extensible": true,
+				"config": {
+					"boolTest": "",
+					"script": "// This operator is needed to keep compatibility to the old datagenerator\nvar counter = 0;\n\ngetRandom = function(min, max) {\n    return Math.random() * (max - min) + min;\n};\n\ngetRandomInt = function(min, max) {\n    return Math.floor(Math.random() * (max - min + 1)) + min;\n};\n\ngenerateData = function() {\n\n    // payload = \"3,26.4,60.9,532.0,1.0,24.0,55.0,0,657.0,437.0,1388,5,-33,3.33\"\n\n    var payload = getRandomInt(2, 6) + \",\"; // DeviceID\n    payload += getRandom(25, 26) + \",\"; // Temperature\n    payload += getRandom(40, 60) + \",\"; // Humidity\n    payload += getRandom(500, 600) + \",\"; // CO2    \n    payload += getRandom(0.9, 1.1) + \",\"; // CO    \n    payload += getRandom(23, 25) + \",\"; // LPG    \n    payload += getRandom(50, 60) + \",\"; // Smoke  \n    payload += getRandomInt(0, 1) + \",\"; // Presence \n    payload += getRandom(600, 800) + \",\"; // Light  \n    payload += getRandom(400, 500) + \"\\r\\n\"; // Sound  \n\n    return payload;\n};\n\n$.addTimer(\"500ms\",doTick);\n\nfunction doTick(ctx) {\n    $.output(counter+\",\"+generateData());\n    counter++;\n}\n"
+				}
+			}
+		},
+		"terminal1": {
+			"component": "com.sap.util.terminal",
+			"metadata": {
+				"label": "Terminal",
+				"x": 703.9999990463257,
+				"y": 12,
+				"height": 80,
+				"width": 120,
+				"ui": "dynpath",
+				"config": {}
+			}
+		},
+		"12multiplexer1": {
+			"component": "com.sap.system.multiplexer.1-2",
+			"metadata": {
+				"label": "1:2 Multiplexer",
+				"x": 350,
+				"y": 72,
+				"height": 80,
+				"width": 120,
+				"extensible": true,
+				"config": {}
+			}
+		},
+		"terminal11": {
+			"component": "com.sap.util.terminal",
+			"metadata": {
+				"label": "Terminal",
+				"x": 703.9999990463257,
+				"y": 132,
+				"height": 80,
+				"width": 120,
+				"ui": "dynpath",
+				"config": {}
+			},
+			"name": "terminal1"
+		},
+		"gooperator1": {
+			"component": "com.sap.system.golangExecutor2",
+			"metadata": {
+				"label": "Go Temp Splitter",
+				"x": 534.9999990463257,
+				"y": 12,
+				"height": 80,
+				"width": 120,
+				"extensible": true,
+				"config": {
+					"script": "package main\n\nimport \"strings\"\n\nvar Temperature func(interface{})\nvar values string\n\nfunc main() {}\n\nfunc Input(val interface{}) {\n    values := strings.Split(val.(string), \",\")\n    Temperature(\"The temperature is \" + values[2]) //Sends only Temperature Value\n}\n",
+					"codelanguage": "go"
+				},
+				"additionalinports": [
+					{
+						"name": "input",
+						"type": "string"
+					}
+				],
+				"additionaloutports": [
+					{
+						"name": "Temperature",
+						"type": "string"
+					}
+				]
+			}
+		},
+		"gooperator11": {
+			"component": "com.sap.system.golangExecutor2",
+			"metadata": {
+				"label": "Go CO2 Splitter",
+				"x": 534.9999990463257,
+				"y": 132,
+				"height": 80,
+				"width": 120,
+				"extensible": true,
+				"config": {
+					"script": "package main\n\nimport \"strings\"\n\nvar CO2 func(interface{})\nvar values string\n\nfunc main() {}\n\nfunc Input(val interface{}) {\n    values := strings.Split(val.(string), \",\")\n    CO2(\"The CO2 level is \" + values[4]) //Sends only Temperature Value\n}\n",
+					"codelanguage": "go"
+				},
+				"additionalinports": [
+					{
+						"name": "input",
+						"type": "string"
+					}
+				],
+				"additionaloutports": [
+					{
+						"name": "CO2",
+						"type": "string"
+					}
+				]
+			},
+			"name": "gooperator1"
+		},
+		"wiretap1": {
+			"component": "com.sap.util.wiretap",
+			"metadata": {
+				"label": "Wiretap",
+				"x": 181,
+				"y": 72,
+				"height": 80,
+				"width": 120,
+				"ui": "dynpath",
+				"config": {}
+			}
+		}
+	},
+	"groups": [],
+	"connections": [
+		{
+			"metadata": {
+				"points": "474,103 501.99999952316284,103 501.99999952316284,52 529.9999990463257,52"
+			},
+			"src": {
+				"port": "out1",
+				"process": "12multiplexer1"
+			},
+			"tgt": {
+				"port": "input",
+				"process": "gooperator1"
+			}
+		},
+		{
+			"metadata": {
+				"points": "658.9999990463257,52 698.9999990463257,52"
+			},
+			"src": {
+				"port": "Temperature",
+				"process": "gooperator1"
+			},
+			"tgt": {
+				"port": "in1",
+				"process": "terminal1"
+			}
+		},
+		{
+			"metadata": {
+				"points": "474,121 501.99999952316284,121 501.99999952316284,172 529.9999990463257,172"
+			},
+			"src": {
+				"port": "out2",
+				"process": "12multiplexer1"
+			},
+			"tgt": {
+				"port": "input",
+				"process": "gooperator11"
+			}
+		},
+		{
+			"metadata": {
+				"points": "658.9999990463257,172 698.9999990463257,172"
+			},
+			"src": {
+				"port": "CO2",
+				"process": "gooperator11"
+			},
+			"tgt": {
+				"port": "in1",
+				"process": "terminal11"
+			}
+		},
+		{
+			"metadata": {
+				"points": "136,112 176,112"
+			},
+			"src": {
+				"port": "output",
+				"process": "datagenerator1"
+			},
+			"tgt": {
+				"port": "in",
+				"process": "wiretap1"
+			}
+		},
+		{
+			"metadata": {
+				"points": "305,112 345,112"
+			},
+			"src": {
+				"port": "out",
+				"process": "wiretap1"
+			},
+			"tgt": {
+				"port": "in1",
+				"process": "12multiplexer1"
+			}
+		}
+	],
+	"inports": {},
+	"outports": {}
+}
