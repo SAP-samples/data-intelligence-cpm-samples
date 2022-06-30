@@ -1,3 +1,5 @@
+[![REUSE status](https://api.reuse.software/badge/github.com/SAP-samples/data-intelligence-cpm-samples)](https://api.reuse.software/info/github.com/SAP-samples/data-intelligence-cpm-samples)
+
 # SAP Data Intelligence Cloud CPM Samples
 
 ## Description
