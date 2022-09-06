@@ -1,0 +1,620 @@
+{
+	"properties": {},
+	"description": "Ariba Requisition Extractor",
+	"processes": {
+		"javascriptv2operator11": {
+			"component": "com.sap.system.jsengine.v2",
+			"metadata": {
+				"label": "Format API Request",
+				"x": 196.99999904632568,
+				"y": 12,
+				"height": 80,
+				"width": 120,
+				"extensible": true,
+				"generation": 1,
+				"config": {
+					"script": "$.setPortCallback(\"input\", firstRun);\r\n$.setPortCallback(\"nextPage\", nextPage);\r\n\r\nvar msg = {};\r\n\r\n\r\n\r\n// Sends the first OpenAPI Request\r\nfunction firstRun(ctx, s){ \r\n    setupRequest();\r\n    $.output(msg); // Sends Request\r\n}\r\n\r\n\r\n\r\n// Sends subsequent OpenAPI Requests\r\nfunction nextPage(ctx, s){\r\n    msg.Attributes[\"openapi.query_params.pageToken\"] = s; // Updates Request with Page Token\r\n    $.output(msg); //Sends Request\r\n}\r\n\r\n\r\n\r\n// Sets up initial values for the OpenAPI Request\r\nfunction setupRequest(){\r\n  \r\n  // Creates blank message\r\n  msg.Attributes = {};\r\n  \r\n   // Set API header parameter\r\n  msg.Attributes[\"openapi.header_params.apiKey\"] = \"API_KEY_HERE\"; //Insert your own API Key here\r\n  \r\n  // Set API query parameters\r\n  msg.Attributes[\"openapi.query_params.realm\"] = \"REALM_HERE\"; //Insert your own Realm here\r\n  \r\n  // Process the dates to be used in the API request filter parameter\r\n  var currentDate = new Date();\r\n  \r\n  var createdTo = new Date();\r\n  createdTo.setDate(currentDate.getDate());\r\n  var createdToString = createdTo.toISOString().slice(0, 10) + \"T00:00:00Z\";\r\n  \r\n  var createdFrom = new Date();\r\n  createdFrom.setDate(currentDate.getDate() - 30); //If you want a larger time period adjust here | Default is 30 days\r\n  var createdFromString = createdFrom.toISOString().slice(0, 10) + \"T00:00:00Z\";\r\n  \r\n  // Set Date Filters\r\n  msg.Attributes[\"openapi.query_params.filters\"] = \r\n    '{\"createdDateFrom\":\"' +\r\n    createdFromString +\r\n    '\",\"createdDateTo\":\"' +\r\n    createdToString +\r\n    \"\\\"}\";\r\n    \r\n  msg.Attributes[\"openapi.query_params.displayStateString\"] = \"true\"; //Sends a human-readable state, instead of numerical\r\n    \r\n  //Set Empty Page Token    \r\n  msg.Attributes[\"openapi.query_params.pageToken\"] = \"\";\r\n\r\n  return msg;\r\n}\r\n"
+				},
+				"additionalinports": [
+					{
+						"name": "input",
+						"type": "message"
+					},
+					{
+						"name": "nextPage",
+						"type": "string"
+					}
+				],
+				"additionaloutports": [
+					{
+						"name": "output",
+						"type": "message"
+					}
+				]
+			},
+			"name": "javascriptv2operator1"
+		},
+		"openapiclient11": {
+			"component": "com.sap.openapi.client",
+			"metadata": {
+				"label": "OpenAPI Client",
+				"x": 365.9999990463257,
+				"y": 12,
+				"height": 80,
+				"width": 120,
+				"generation": 1,
+				"ui": "dynpath",
+				"config": {
+					"connectionType": "connection",
+					"basePath": "/api/procurement-reporting-details/v2/prod",
+					"connection": {
+						"configurationType": "Configuration Manager",
+						"connectionID": "ARIBA_PROCUREMENT"
+					},
+					"pathPattern": "/views/Requisition_SAP_createdRange",
+					"consumes": "application/json",
+					"produces": "application/json"
+				}
+			},
+			"name": "openapiclient1"
+		},
+		"tostringconverter1": {
+			"component": "com.sap.util.toStringConverter",
+			"metadata": {
+				"label": "ToString Converter",
+				"x": 550.9999980926514,
+				"y": 27,
+				"height": 50,
+				"width": 50,
+				"generation": 1,
+				"config": {}
+			}
+		},
+		"stringoperator11": {
+			"component": "com.sap.system.golangengine2",
+			"metadata": {
+				"label": "Process API Response",
+				"x": 649.9999980926514,
+				"y": 12,
+				"height": 82,
+				"width": 120,
+				"extensible": true,
+				"generation": 1,
+				"config": {
+					"script": "package main\n\nimport (\n    \"strings\"\n    \"time\"\n)\n\nfunc main() {}\n\n//var pageToken string\n\nvar Log func(string) //For logging\n\nvar Output func(interface{}) //Output port - used for sending response data\nvar NextPage func(interface{}) //Output port - used for sending Page Token data\nvar FinalRecords func(interface{}) //Output port - used for sending the final page of records\nvar ApiError func(interface{})\n\nfunc Input(val interface{}) {\n    if checkStatus(val.(string)) {  //Ensures that the HTTP Status is 200\n        \n        response := strings.Split(val.(string), `],\"PageToken\":\"`)\n        \n        if len(response) > 1{   //Checks for the presence of a Page Token\n            Output(response[0]) //Sends the response (minus Page Token) through the Output port\n            \n            time.Sleep(20 * time.Second)        //Waits 20 seconds to avoid triggering the rate limit on Ariba\n            NextPage(getToken(response[1]))     //Sends the Page Token through the NextPage output port\n        }else{\n            Log(\"Final set of records: \" + val.(string))\n            FinalRecords(val.(string))\n        }\n        \n    } else{ //HTTP Status is anything other than 200\n        Log(\"Recieved error code: \" + val.(string))\n        ApiError(val.(string))\n    }\n}\n\nfunc checkStatus(response string) bool{ //Returns true if HTTP status is 200, else false\n    return strings.Contains(response, `\"openapi.status_code\":\"200\"`)\n}\n\nfunc getToken(pageToken string) string{ //Strips the Page Token from the string\n    intermediate := strings.Split(pageToken, `\"}`)\n    return intermediate[0]\n}"
+				},
+				"additionaloutports": [
+					{
+						"name": "finalRecords",
+						"type": "string"
+					},
+					{
+						"name": "apiError",
+						"type": "string"
+					},
+					{
+						"name": "nextPage",
+						"type": "string"
+					}
+				]
+			},
+			"name": "stringoperator1"
+		},
+		"tofile2": {
+			"component": "com.sap.file.toFile",
+			"metadata": {
+				"label": "To File",
+				"x": 845.4999990463257,
+				"y": 242,
+				"height": 50,
+				"width": 50,
+				"generation": 1,
+				"config": {}
+			}
+		},
+		"writefile2": {
+			"component": "com.sap.file.write",
+			"metadata": {
+				"label": "Write Error Log",
+				"x": 962,
+				"y": 332,
+				"height": 80,
+				"width": 120,
+				"generation": 1,
+				"config": {
+					"pathMode": "Static (from configuration)",
+					"connection": {
+						"configurationType": "Connection Management",
+						"connectionID": "DI_DATA_LAKE"
+					},
+					"path": "/shared/RequisitionErrorLog.txt",
+					"mode": "Overwrite"
+				}
+			}
+		},
+		"graphterminator2": {
+			"component": "com.sap.util.graphTerminator",
+			"metadata": {
+				"label": "Error: Graph Terminator",
+				"x": 1109,
+				"y": 332,
+				"height": 80,
+				"width": 120,
+				"generation": 1,
+				"config": {}
+			}
+		},
+		"stringoperator111": {
+			"component": "com.sap.system.golangengine2",
+			"metadata": {
+				"label": "Collate Records",
+				"x": 876.9999980926514,
+				"y": 12,
+				"height": 80,
+				"width": 120,
+				"extensible": true,
+				"generation": 1,
+				"config": {
+					"script": "package main\n\nimport (\n    \"strings\"\n)\n\nfunc main() {}\n\nvar recordsString string\n\nvar Log func(string) //For logging\n\nvar Output func(interface{})\nvar WriteFile func(interface{})\n\n\nfunc Input(val interface{}) {\n    if recordsString == \"\" {\n        firstResponse := strings.Split(val.(string), `\"openapi.status_code\":\"200\"}`)\n        recordsString = firstResponse[1]\n        Log(recordsString)\n    }else{\n        nextResponse := strings.Split(val.(string), `\"Records\":[`)\n        recordsString+= `,` + nextResponse[1]\n        Log(recordsString)\n    }\n}\n\nfunc FinalRecords(val interface{}){\n    if recordsString == \"\" {\n        //Only set of data - remove header info\n        fullResponse := strings.Split(val.(string), `\"openapi.status_code\":\"200\"}`)\n        WriteFile(fullResponse[1]) //Writes the data to a flat file\n        Output(fullResponse[1])\n    }else{\n        //Final set of data - remove the header info and records tag\n        lastResponse := strings.Split(val.(string), `\"Records\":[`)\n        recordsString += `,` + lastResponse[1]\n        WriteFile(recordsString) //Writes the data to a flat file\n        Output(recordsString)\n    }\n}"
+				},
+				"additionalinports": [
+					{
+						"name": "finalRecords",
+						"type": "string"
+					}
+				],
+				"additionaloutports": [
+					{
+						"name": "writeFile",
+						"type": "string"
+					}
+				]
+			},
+			"name": "stringoperator11"
+		},
+		"javascriptv2operator12": {
+			"component": "com.sap.system.jsengine.v2",
+			"metadata": {
+				"label": "DocStore Composer",
+				"x": 1169,
+				"y": -51,
+				"height": 80,
+				"width": 120,
+				"extensible": true,
+				"generation": 1,
+				"config": {
+					"script": "$.setPortCallback(\"input\",onInput)\n\nsingleQuoteMatch = /'/g;\nunicodeReplacement = /�/g;\n\nfunction onInput(ctx,s) {\n    \n    var resultsSet = JSON.parse(s);\n    \n    var length = Object.keys(resultsSet.Records).length;\n    \n    var tempRecord = \"\";\n\n    $.output(\"TRUNCATE COLLECTION \\\"INSERT_SCHEMA_HERE\\\".\\\"aribaRequisition\\\";\"); //Insert Schema Here\n    \n    for (var i = 0; i < length; i++){\n        \n        tempRecord = JSON.stringify(resultsSet.Records[i]);\n        \n        tempRecord = tempRecord.replace(singleQuoteMatch, \"''\"); //For SQL Compatibility\n        tempRecord = tempRecord.replace(unicodeReplacement, ''); //To avoid errors when Unicode Replacement character is present\n        \n        $.output(\"INSERT INTO \\\"INSERT_SCHEMA_HERE\\\".\\\"aribaRequisition\\\" VALUES('\" + tempRecord + \"');\");  //Insert Schema Here\n    }\n    \n    //Terminate the Graph\n    $.finished(\"Done\");\n}\n\n"
+				},
+				"additionalinports": [
+					{
+						"name": "input",
+						"type": "string"
+					}
+				],
+				"additionaloutports": [
+					{
+						"name": "output",
+						"type": "string"
+					},
+					{
+						"name": "finished",
+						"type": "string"
+					}
+				]
+			},
+			"name": "javascriptv2operator1"
+		},
+		"saphanaclient1111": {
+			"component": "com.sap.hana.client2",
+			"metadata": {
+				"label": "SAP HANA Client",
+				"x": 1323.9999990463257,
+				"y": -51,
+				"height": 80,
+				"width": 120,
+				"generation": 1,
+				"config": {
+					"connection": {
+						"connectionProperties": {
+							"additionalHosts": [],
+							"host": "host",
+							"password": "",
+							"port": 9000,
+							"proxyHost": "",
+							"proxyPassword": "",
+							"proxyPort": 1080,
+							"proxyUser": "",
+							"useTLS": false,
+							"user": ""
+						},
+						"configurationType": "Configuration Manager",
+						"connectionID": "ARIBA_HDI"
+					}
+				}
+			},
+			"name": "saphanaclient111"
+		},
+		"tostringconverter2": {
+			"component": "com.sap.util.toStringConverter",
+			"metadata": {
+				"label": "ToString Converter",
+				"x": 1526.9999985694885,
+				"y": -36,
+				"height": 50,
+				"width": 50,
+				"generation": 1,
+				"config": {}
+			}
+		},
+		"terminal111": {
+			"component": "com.sap.util.terminal",
+			"metadata": {
+				"label": "Terminal",
+				"x": 1630.9999980926514,
+				"y": -51,
+				"height": 80,
+				"width": 120,
+				"generation": 1,
+				"ui": "dynpath",
+				"config": {}
+			},
+			"name": "terminal11"
+		},
+		"graphterminator1": {
+			"component": "com.sap.util.graphTerminator",
+			"metadata": {
+				"label": "Done: Graph Terminator",
+				"x": 1528,
+				"y": 77,
+				"height": 80,
+				"width": 120,
+				"generation": 1,
+				"config": {}
+			}
+		},
+		"stringoperator112": {
+			"component": "com.sap.system.golangengine2",
+			"metadata": {
+				"label": "Wait After Update",
+				"x": 1323.9999980926514,
+				"y": 77,
+				"height": 80,
+				"width": 120,
+				"extensible": true,
+				"generation": 1,
+				"config": {
+					"script": "package main\n\nimport (\n    \"time\"\n)\n\nfunc main() {}\n\nvar Log func(string) //For logging\n\nvar Output func(interface{}) //Output port - used for sending the trigger to terminate the graph\n\nfunc Input(val interface{}) {\n    if val.(string) == \"Done\" { \n            time.Sleep(1 * time.Minute)        //Waits 1 minute then terminates the graph\n            Output(\"Done\")\n    }\n}"
+				}
+			},
+			"name": "stringoperator11"
+		},
+		"writefile1": {
+			"component": "com.sap.file.write",
+			"metadata": {
+				"label": "Write Payload Flat File",
+				"x": 1149,
+				"y": 74,
+				"height": 80,
+				"width": 120,
+				"generation": 1,
+				"config": {
+					"connection": {
+						"configurationType": "Connection Management",
+						"connectionID": "DI_DATA_LAKE"
+					},
+					"mode": "Overwrite",
+					"pathMode": "Static (from configuration)",
+					"path": "/shared/RequisitionPayload.txt"
+				}
+			}
+		},
+		"tofile1": {
+			"component": "com.sap.file.toFile",
+			"metadata": {
+				"label": "To File",
+				"x": 1069.9999990463257,
+				"y": 92,
+				"height": 50,
+				"width": 50,
+				"generation": 1,
+				"config": {}
+			}
+		},
+		"workflowtrigger1": {
+			"component": "com.sap.dh.trigger",
+			"metadata": {
+				"label": "Workflow Trigger",
+				"x": 12,
+				"y": 12,
+				"height": 80,
+				"width": 120,
+				"extensible": true,
+				"generation": 1,
+				"config": {}
+			}
+		}
+	},
+	"groups": [
+		{
+			"name": "group1",
+			"nodes": [
+				"javascriptv2operator11",
+				"openapiclient11",
+				"tostringconverter1",
+				"stringoperator11"
+			],
+			"metadata": {
+				"description": "Fetch Data"
+			}
+		},
+		{
+			"name": "group2",
+			"nodes": [
+				"tofile2",
+				"writefile2",
+				"graphterminator2"
+			],
+			"metadata": {
+				"description": "API Error Handling"
+			}
+		},
+		{
+			"name": "group3",
+			"nodes": [
+				"stringoperator111",
+				"javascriptv2operator12",
+				"saphanaclient1111",
+				"tostringconverter2",
+				"terminal111",
+				"graphterminator1",
+				"stringoperator112",
+				"writefile1",
+				"tofile1"
+			],
+			"metadata": {
+				"description": "Update Records"
+			}
+		}
+	],
+	"connections": [
+		{
+			"metadata": {
+				"points": "320.9999990463257,52 360.9999990463257,52"
+			},
+			"src": {
+				"port": "output",
+				"process": "javascriptv2operator11"
+			},
+			"tgt": {
+				"port": "in",
+				"process": "openapiclient11"
+			}
+		},
+		{
+			"metadata": {
+				"points": "136,52 163.99999952316284,52 163.99999952316284,43 191.99999904632568,43"
+			},
+			"src": {
+				"port": "output",
+				"process": "workflowtrigger1"
+			},
+			"tgt": {
+				"port": "input",
+				"process": "javascriptv2operator11"
+			}
+		},
+		{
+			"metadata": {
+				"points": "489.9999990463257,52 517.9999985694885,52 517.9999985694885,61 545.9999980926514,61"
+			},
+			"src": {
+				"port": "out",
+				"process": "openapiclient11"
+			},
+			"tgt": {
+				"port": "inmessage",
+				"process": "tostringconverter1"
+			}
+		},
+		{
+			"metadata": {
+				"points": "604.9999980926514,52 625,52 625,53 644.9999980926514,53"
+			},
+			"src": {
+				"port": "outstring",
+				"process": "tostringconverter1"
+			},
+			"tgt": {
+				"port": "input",
+				"process": "stringoperator11"
+			}
+		},
+		{
+			"metadata": {
+				"points": "754.9999980926514,21 820.5,21 820.5,43 871.9999980926514,43"
+			},
+			"src": {
+				"port": "output",
+				"process": "stringoperator11"
+			},
+			"tgt": {
+				"port": "input",
+				"process": "stringoperator111"
+			}
+		},
+		{
+			"metadata": {
+				"points": "773.9999980926514,44 823,44 823,61 871.9999980926514,61"
+			},
+			"src": {
+				"port": "finalRecords",
+				"process": "stringoperator11"
+			},
+			"tgt": {
+				"port": "finalRecords",
+				"process": "stringoperator111"
+			}
+		},
+		{
+			"metadata": {
+				"points": "1000.9999980926514,61 1033,61 1033,126 1064.9999990463257,126"
+			},
+			"src": {
+				"port": "writeFile",
+				"process": "stringoperator111"
+			},
+			"tgt": {
+				"port": "in",
+				"process": "tofile1"
+			}
+		},
+		{
+			"metadata": {
+				"points": "1123.9999990463257,117 1134,117 1134,114 1144,114"
+			},
+			"src": {
+				"port": "file",
+				"process": "tofile1"
+			},
+			"tgt": {
+				"port": "file",
+				"process": "writefile1"
+			}
+		},
+		{
+			"metadata": {
+				"points": "1000.9999980926514,43 1082.5,43 1082.5,-11 1164,-11"
+			},
+			"src": {
+				"port": "output",
+				"process": "stringoperator111"
+			},
+			"tgt": {
+				"port": "input",
+				"process": "javascriptv2operator12"
+			}
+		},
+		{
+			"metadata": {
+				"points": "1293,-20 1318.9999990463257,-20"
+			},
+			"src": {
+				"port": "output",
+				"process": "javascriptv2operator12"
+			},
+			"tgt": {
+				"port": "sql",
+				"process": "saphanaclient1111"
+			}
+		},
+		{
+			"metadata": {
+				"points": "1447.9999990463257,-11 1485,-11 1485,-20 1521.9999985694885,-20"
+			},
+			"src": {
+				"port": "result",
+				"process": "saphanaclient1111"
+			},
+			"tgt": {
+				"port": "ininterface",
+				"process": "tostringconverter2"
+			}
+		},
+		{
+			"metadata": {
+				"points": "1580.9999985694885,-11 1625.9999980926514,-11"
+			},
+			"src": {
+				"port": "outstring",
+				"process": "tostringconverter2"
+			},
+			"tgt": {
+				"port": "in1",
+				"process": "terminal111"
+			}
+		},
+		{
+			"metadata": {
+				"points": "1447.9999980926514,117 1523,117"
+			},
+			"src": {
+				"port": "output",
+				"process": "stringoperator112"
+			},
+			"tgt": {
+				"port": "stop",
+				"process": "graphterminator1"
+			}
+		},
+		{
+			"metadata": {
+				"points": "1293,-2 1306,-2 1306,117 1318.9999980926514,117"
+			},
+			"src": {
+				"port": "finished",
+				"process": "javascriptv2operator12"
+			},
+			"tgt": {
+				"port": "input",
+				"process": "stringoperator112"
+			}
+		},
+		{
+			"metadata": {
+				"points": "899.4999990463257,267 928.25,267 928.25,372 957,372"
+			},
+			"src": {
+				"port": "file",
+				"process": "tofile2"
+			},
+			"tgt": {
+				"port": "file",
+				"process": "writefile2"
+			}
+		},
+		{
+			"metadata": {
+				"points": "1086,363 1095,363 1095,372 1104,372"
+			},
+			"src": {
+				"port": "file",
+				"process": "writefile2"
+			},
+			"tgt": {
+				"port": "stop",
+				"process": "graphterminator2"
+			}
+		},
+		{
+			"metadata": {
+				"points": "773.9999980926514,62 807.25,62 807.25,276 840.4999990463257,276"
+			},
+			"src": {
+				"port": "apiError",
+				"process": "stringoperator11"
+			},
+			"tgt": {
+				"port": "in",
+				"process": "tofile2"
+			}
+		},
+		{
+			"metadata": {
+				"points": "754.9999980926514,85 792,85 792,120 174,120 174,61 191.99999904632568,61"
+			},
+			"src": {
+				"port": "nextPage",
+				"process": "stringoperator11"
+			},
+			"tgt": {
+				"port": "nextPage",
+				"process": "javascriptv2operator11"
+			}
+		}
+	],
+	"inports": {},
+	"outports": {},
+	"metadata": {
+		"generation": 1
+	}
+}
