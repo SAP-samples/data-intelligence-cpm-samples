@@ -6,7 +6,7 @@
 This repository contains files to accompany SAP Data Intelligence Cloud blog posts on the SAP Community. These files include graphs (pipelines) in JSON format, which can be imported into your Data Intelligence Cloud system, allowing you to follow along in your own system
 
 ## Requirements
-These samples require access to an SAP Data Intelligence System. They are known to work on Data Intelligence Cloud version 2107 and have not been tested against SAP Data Intelligence for On-Premise.
+These samples require access to an SAP Data Intelligence System. They are known to work on Data Intelligence Cloud at the time of publishing and have not been tested against SAP Data Intelligence for On-Premise.
 
 ## Download and Installation
 The preferred way of importing the graph (pipeline) files into your Data Intelligence System is through the Modeler.
